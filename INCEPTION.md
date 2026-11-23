@@ -16,6 +16,12 @@ msbuild .\Build\MTASA.sln /m /p:Configuration=Release /p:Platform=Win32
 
 ## Sunucu anti-cheat
 
+Aynı çözümde Windows sunucusunu x64 hedefiyle derle. İstemci ve sunucu kendi çalışma zamanı dosyalarıyla birlikte `Bin` altında üretilir.
+
+```powershell
+msbuild .\Build\MTASA.sln /m /p:Configuration=Release /p:Platform=x64
+```
+
 Değiştirilen sunucu derlemesinin etkin `mtaserver.conf` dosyasında `<inception_enforce_client_event_limit>1</inception_enforce_client_event_limit>` ayarla ve sunucuyu yeniden başlat. Kota, mevcut `player_triggered_event_interval` ve `max_player_triggered_events_per_interval` ayarlarını kullanır. Varsayılan değerler oyuncu başına 1.000 ms ve 100 olaydır. Pencere, oyuncunun ilk olayıyla veya önceki pencere dolduktan sonra gelen ilk olayla açılır. Kota dolduktan sonra gelen çağrılar Lua işleyicilerine iletilmez. Sunucu otomatik ban uygulamaz.
 
 Korumalı element verileri için MTA’nın `elementdata_whitelisted` ayarı ve `setElementData` erişim ilkeleri kullanılabilir. Para, envanter ve yönetim işlemlerinde oyuncu kimliğini `client` üzerinden al ve işlem yetkisini sunucuda doğrula. [MTA betik güvenliği](https://wiki.multitheftauto.com/wiki/Script_security) ve [element verisi ilkeleri](https://wiki.multitheftauto.com/wiki/SetElementData).
