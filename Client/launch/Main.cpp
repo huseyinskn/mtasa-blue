@@ -14,9 +14,10 @@
 #include "resource.h"
 
 // C++ STL
-#include <array>        // std::array for safe command buffer
-#include <bit>          // std::bit_cast for safe function pointer conversion
-#include <expected>     // std::expected/std::unexpected for error handling
+#include <array>     // std::array for safe command buffer
+#include <bit>       // std::bit_cast for safe function pointer conversion
+#include <expected>  // std::expected/std::unexpected for error handling
+#include <memory>
 #include <format>       // std::format for string formatting
 #include <ranges>       // std::ranges::copy/copy_n for safe copying
 #include <span>         // std::span for memory view with bounds checking
@@ -28,7 +29,10 @@
 #include <cstring>  // std::strlen for C string length
 
 // Platform-specific headers
+#include <gdiplus.h>
 #include <psapi.h>  // GetModuleInformation, MODULEINFO
+
+#pragma comment(lib, "Gdiplus.lib")
 
 /*
     IMPORTANT
@@ -278,15 +282,43 @@ namespace mta::launcher
 
     struct RebornDialog
     {
-        HBRUSH background = nullptr;
-        HFONT  titleFont = nullptr;
+        HBRUSH                           background = nullptr;
+        HFONT                            titleFont = nullptr;
+        ULONG_PTR                        imageRuntime = 0;
+        IStream*                         logoStream = nullptr;
+        std::unique_ptr<Gdiplus::Bitmap> logo;
 
         ~RebornDialog()
         {
+            logo.reset();
+            if (logoStream)
+                logoStream->Release();
+            if (imageRuntime)
+                Gdiplus::GdiplusShutdown(imageRuntime);
             if (titleFont)
                 DeleteObject(titleFont);
             if (background)
                 DeleteObject(background);
+        }
+
+        void LoadLogo(HWND dialog)
+        {
+            const auto  module = reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(dialog, GWLP_HINSTANCE));
+            const HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(IDR_REBORN_LOGO), MAKEINTRESOURCEW(10));
+            if (!resource)
+                return;
+            const HGLOBAL data = LoadResource(module, resource);
+            if (!data)
+                return;
+
+            // The layout embeds the original PNG from the Reborn auth resource.
+            logoStream = SHCreateMemStream(static_cast<const BYTE*>(LockResource(data)), SizeofResource(module, resource));
+            if (!logoStream)
+                return;
+
+            Gdiplus::GdiplusStartupInput startup;
+            if (Gdiplus::GdiplusStartup(&imageRuntime, &startup, nullptr) == Gdiplus::Ok)
+                logo = std::make_unique<Gdiplus::Bitmap>(logoStream);
         }
 
         static bool IsNicknameValid(const char* input)
@@ -334,6 +366,7 @@ namespace mta::launcher
                     state = reinterpret_cast<RebornDialog*>(lParam);
                     SetWindowLongPtrW(dialog, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
                     state->background = CreateSolidBrush(RGB(18, 26, 40));
+                    state->LoadLogo(dialog);
                     RECT titleSize{0, 0, 0, 16};
                     MapDialogRect(dialog, &titleSize);
                     state->titleFont = CreateFontW(-titleSize.bottom, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
@@ -347,6 +380,22 @@ namespace mta::launcher
                     const auto nickname = GetApplicationSetting("reborn-launcher-nickname");
                     if (IsNicknameValid(nickname.c_str()))
                         SetDlgItemTextW(dialog, IDC_REBORN_NICKNAME, FromUTF8(nickname).c_str());
+                    return TRUE;
+                }
+                case WM_DRAWITEM:
+                {
+                    const auto& item = *reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
+                    if (item.CtlID != IDC_REBORN_LOGO)
+                        return FALSE;
+
+                    FillRect(item.hDC, &item.rcItem, state->background);
+                    if (state->logo && state->logo->GetLastStatus() == Gdiplus::Ok)
+                    {
+                        const int         size = std::min(item.rcItem.right - item.rcItem.left, item.rcItem.bottom - item.rcItem.top);
+                        Gdiplus::Graphics graphics(item.hDC);
+                        graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+                        graphics.DrawImage(state->logo.get(), static_cast<int>(item.rcItem.left), static_cast<int>(item.rcItem.top), size, size);
+                    }
                     return TRUE;
                 }
                 case WM_CTLCOLORDLG:
