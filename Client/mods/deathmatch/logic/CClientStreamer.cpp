@@ -186,9 +186,7 @@ void                CClientStreamer::DoPulse(CVector& vecPosition)
         }
     }
 
-    // Update distances every frame
-    SetExpDistances(&m_ActiveElements);
-    m_ActiveElements.sort(CompareExpDistance);
+    UpdateActiveElementDistances();
 
     Restream(bMovedFar);
 }
@@ -334,17 +332,21 @@ void CClientStreamer::RemoveElement(CClientStreamElement* pElement)
     m_ToStreamOut.remove(pElement);
 }
 
-void CClientStreamer::SetExpDistances(list<CClientStreamElement*>* pList)
+void CClientStreamer::UpdateActiveElementDistances()
 {
-    // Run through our list setting distances to world center
-    CClientStreamElement*                 pElement = NULL;
-    list<CClientStreamElement*>::iterator iter = pList->begin();
-    for (; iter != pList->end(); iter++)
+    CClientStreamElement* previous = nullptr;
+    bool                  needsSort = false;
+
+    for (CClientStreamElement* element : m_ActiveElements)
     {
-        pElement = *iter;
-        // Set its distance ^ 2
-        pElement->SetExpDistance(pElement->GetDistanceToBoundingBoxSquared(m_vecPosition));
+        element->SetExpDistance(element->GetDistanceToBoundingBoxSquared(m_vecPosition));
+        needsSort = needsSort || (previous && CompareExpDistance(element, previous));
+        previous = element;
     }
+
+    // Nearby elements often retain their order between frames. Reuse that order when possible.
+    if (needsSort)
+        m_ActiveElements.sort(CompareExpDistance);
 }
 
 void CClientStreamer::AddToSortedList(list<CClientStreamElement*>* pList, CClientStreamElement* pElement)
@@ -360,7 +362,7 @@ void CClientStreamer::AddToSortedList(list<CClientStreamElement*>* pList, CClien
     // Track in the set
     m_ActiveElementSet.insert(pElement);
 
-    // Append unsorted - DoPulse sorts the list every frame via m_ActiveElements.sort()
+    // Append unsorted. The next pulse checks distance ordering before streaming.
     pList->push_back(pElement);
 }
 

@@ -2768,6 +2768,14 @@ void CGame::Packet_LuaEvent(CLuaEventPacket& Packet)
     ElementID      ElementID = Packet.GetElementID();
     CLuaArguments* pArguments = Packet.GetArguments();
 
+    // Count even rejected requests against the sender's budget before Lua dispatch.
+    if (m_pMainConfig->ShouldEnforceClientEventLimit() &&
+        !pCaller->ConsumeClientEventBudget(m_iClientTriggeredEventsIntervalMs, m_iMaxClientTriggeredEventsPerInterval))
+    {
+        RegisterClientTriggeredEventUsage(pCaller, szName);
+        return;
+    }
+
     // Grab the element
     CElement* pElement = CElementIDs::GetElement(ElementID);
     if (pElement)
