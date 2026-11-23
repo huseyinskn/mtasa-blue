@@ -6,7 +6,7 @@ Başlatıcıdaki **Oyuna Gir** düğmesi paket içindeki MTA:SA 1.6 istemcisini 
 
 1. Visual Studio 2026 Build Tools (v145) veya 2022 Build Tools (v143), C++ masaüstü bileşenleri ve Windows SDK kurulu olmalı. Bu dalın kaynak dosyaları Windows SDK başlıklarını kullanır. Upstream derleme akışı DirectX SDK dosyalarını da kullanır. [MTA Windows derleme kılavuzu](https://github.com/multitheftauto/mtasa-blue#build-instructions).
 2. Gerekirse DirectX SDK yolunu PowerShell oturumunda `$env:DXSDK_DIR` ile belirt.
-3. Depo kökünde aşağıdaki komutları çalıştır. Derlemeden sonra `Bin` altındaki MTA başlatıcısını test için kullandığın GTA: San Andreas kurulumuyla aç.
+3. Depo kökünde aşağıdaki komutları Visual Studio Developer PowerShell üzerinden çalıştır. x86 istemci ve x86 sunucu `Bin` altında üretilir. ZIP paketinde `Reborn Roleplay.exe` dosyasını aç. Kaynaktan derlediğinde aynı başlatıcı `Bin/Multi Theft Auto.exe` adıyla oluşur.
 
 ```powershell
 .\win-create-projects.bat
@@ -18,7 +18,7 @@ msbuild .\Build\MTASA.sln /m /p:Configuration=Release /p:Platform=Win32 /p:Platf
 
 Oyuncular mevcut MTA 1.6 sunucusuna doğrudan bağlanabilir. Aşağıdaki kota, Reborn sunucu derlemesi VDS’ye alındığında çalışır. Mevcut login, karakter ve SQL resource’ları ayrı olarak VDS’de tutulur.
 
-Aynı çözümde Windows sunucusunu x64 hedefiyle derle. İstemci ve sunucu kendi çalışma zamanı dosyalarıyla birlikte `Bin` altında üretilir.
+Windows x64 sunucu gerekiyorsa aynı çözümü aşağıdaki hedefle derle. Linux VDS için deponun `linux-build.sh` akışı kullanılır. Oyuncu başlatıcısı Windows x86 olarak kalır.
 
 ```powershell
 msbuild .\Build\MTASA.sln /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v145
