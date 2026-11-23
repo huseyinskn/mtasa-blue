@@ -90,6 +90,8 @@ public:
     const char* GetNick() { return m_strNick; };
     void        SetNick(const char* szNick);
 
+    bool ConsumeClientEventBudget(unsigned int intervalMs, unsigned int eventLimit);
+
     int                GetGameVersion() { return m_iGameVersion; };
     void               SetGameVersion(int iGameVersion) { m_iGameVersion = iGameVersion; };
     unsigned short     GetMTAVersion() { return m_usMTAVersion; };
@@ -360,10 +362,10 @@ public:
     SString                m_strD3d9Md5;
     SString                m_strD3d9Sha256;
 
-    CElapsedTime m_ResourceStartPacketTimer;
-    unsigned int m_ResourceStartTokens{50};
+    CElapsedTime       m_ResourceStartPacketTimer;
+    unsigned int       m_ResourceStartTokens{50};
     unsigned long long m_ResourceStartRefillRemainderMs{};
-    unsigned int m_ResourceStartDrops{};
+    unsigned int       m_ResourceStartDrops{};
 
     unsigned int m_uiActiveSatchelCount{};
     CElapsedTime m_DetonateSatchelTimer;
@@ -371,6 +373,8 @@ public:
 
 private:
     SLightweightSyncData m_lightweightSyncData;
+    unsigned long long   m_clientEventWindowStart = 0;
+    unsigned int         m_clientEventsInWindow = 0;
 
     void WriteCameraModePacket();
     void WriteCameraPositionPacket();

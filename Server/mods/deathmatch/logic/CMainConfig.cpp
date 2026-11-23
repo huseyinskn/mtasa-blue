@@ -540,6 +540,7 @@ bool CMainConfig::Load()
     }
 
     GetBoolean(m_pRootNode, "elementdata_whitelisted", m_elementDataWhitelisted);
+    GetBoolean(m_pRootNode, "reborn_enforce_client_event_limit", m_enforceClientEventLimit);
     GetBoolean(m_pRootNode, "check_duplicate_serials", m_checkDuplicateSerials);
 
     ApplyNetOptions();

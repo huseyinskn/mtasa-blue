@@ -10,6 +10,8 @@
  *****************************************************************************/
 
 #include "StdInc.h"
+#include "RebornServer.h"
+#include "resource.h"
 
 // C++ STL
 #include <array>        // std::array for safe command buffer
@@ -274,6 +276,125 @@ namespace mta::launcher
         }
     }
 
+    struct RebornDialog
+    {
+        HBRUSH background = nullptr;
+        HFONT  titleFont = nullptr;
+
+        ~RebornDialog()
+        {
+            if (titleFont)
+                DeleteObject(titleFont);
+            if (background)
+                DeleteObject(background);
+        }
+
+        static bool IsNicknameValid(const char* input)
+        {
+            const std::string_view nickname = input;
+            if (nickname.size() < 3 || nickname.size() > 22 || _stricmp(input, "admin") == 0 || _stricmp(input, "console") == 0 ||
+                _stricmp(input, "server") == 0)
+                return false;
+
+            return std::ranges::all_of(nickname, [](char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'; });
+        }
+
+        static bool Launch(std::string_view nickname)
+        {
+            // Use the executable path directly so Windows never routes the URI to a stock MTA installation.
+            std::wstring executable(32768, L'\0');
+            const DWORD  length = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+            if (!length || length >= executable.size())
+                return false;
+            executable.resize(length);
+
+            const auto   uri = FromUTF8(std::format("mtasa://{}@{}:{}", nickname, Reborn::ServerHost, Reborn::ServerPort));
+            std::wstring command = L"\"" + executable + L"\" " + uri.c_str();
+            STARTUPINFOW startup{};
+            startup.cb = sizeof(startup);
+            PROCESS_INFORMATION child{};
+            if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &child))
+                return false;
+
+            CloseHandle(child.hThread);
+            CloseHandle(child.hProcess);
+            return true;
+        }
+
+        static INT_PTR CALLBACK HandleMessage(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam)
+        {
+            auto* state = reinterpret_cast<RebornDialog*>(GetWindowLongPtrW(dialog, DWLP_USER));
+            if (!state && message != WM_INITDIALOG)
+                return FALSE;
+
+            switch (message)
+            {
+                case WM_INITDIALOG:
+                {
+                    state = reinterpret_cast<RebornDialog*>(lParam);
+                    SetWindowLongPtrW(dialog, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+                    state->background = CreateSolidBrush(RGB(18, 26, 40));
+                    RECT titleSize{0, 0, 0, 16};
+                    MapDialogRect(dialog, &titleSize);
+                    state->titleFont = CreateFontW(-titleSize.bottom, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                                                   CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+                    if (state->titleFont)
+                        SendDlgItemMessageW(dialog, IDC_REBORN_TITLE, WM_SETFONT, reinterpret_cast<WPARAM>(state->titleFont), TRUE);
+
+                    const auto endpoint = FromUTF8(std::format("{}:{}", Reborn::ServerHost, Reborn::ServerPort));
+                    SetDlgItemTextW(dialog, IDC_REBORN_ENDPOINT, endpoint.c_str());
+                    SendDlgItemMessageW(dialog, IDC_REBORN_NICKNAME, EM_SETLIMITTEXT, 22, 0);
+                    const auto nickname = GetApplicationSetting("reborn-launcher-nickname");
+                    if (IsNicknameValid(nickname.c_str()))
+                        SetDlgItemTextW(dialog, IDC_REBORN_NICKNAME, FromUTF8(nickname).c_str());
+                    return TRUE;
+                }
+                case WM_CTLCOLORDLG:
+                    return reinterpret_cast<INT_PTR>(state->background);
+                case WM_CTLCOLORSTATIC:
+                    SetBkMode(reinterpret_cast<HDC>(wParam), TRANSPARENT);
+                    SetTextColor(reinterpret_cast<HDC>(wParam),
+                                 GetDlgCtrlID(reinterpret_cast<HWND>(lParam)) == IDC_REBORN_TITLE ? RGB(89, 234, 183) : RGB(212, 224, 239));
+                    return reinterpret_cast<INT_PTR>(state->background);
+                case WM_COMMAND:
+                    if (LOWORD(wParam) == IDOK)
+                    {
+                        wchar_t input[23]{};
+                        GetDlgItemTextW(dialog, IDC_REBORN_NICKNAME, input, static_cast<int>(std::size(input)));
+                        const auto nickname = ToUTF8(input);
+                        if (!IsNicknameValid(nickname.c_str()))
+                        {
+                            SetDlgItemTextW(dialog, IDC_REBORN_STATUS, L"3\u201322 karakter kullan: harf, rakam veya alt cizgi.");
+                            SetFocus(GetDlgItem(dialog, IDC_REBORN_NICKNAME));
+                            return TRUE;
+                        }
+                        const auto root = GetLaunchPath();
+                        // Report partial extractions before starting the underlying game loader.
+                        if (!FileExists(PathJoin(root, "mta", LOADER_DLL.data())) || !FileExists(PathJoin(root, "mods", "deathmatch", "client.dll")))
+                        {
+                            SetDlgItemTextW(dialog, IDC_REBORN_STATUS, L"Oyun dosyalar\u0131 eksik. ZIP paketinin tamam\u0131n\u0131 \u00e7\u0131kar.");
+                            return TRUE;
+                        }
+                        if (!Launch(nickname.c_str()))
+                        {
+                            SetDlgItemTextW(dialog, IDC_REBORN_STATUS, L"Oyun baslatilamadi. Paketi yeniden cikarmayi dene.");
+                            return TRUE;
+                        }
+                        SetApplicationSetting("reborn-launcher-nickname", nickname);
+                        EndDialog(dialog, IDOK);
+                        return TRUE;
+                    }
+                    if (LOWORD(wParam) == IDCANCEL)
+                    {
+                        EndDialog(dialog, IDCANCEL);
+                        return TRUE;
+                    }
+                    break;
+            }
+            return FALSE;
+        }
+    };
+
     // Path validation
     [[nodiscard]] constexpr bool ValidatePathSafety(std::string_view path) noexcept
     {
@@ -317,6 +438,17 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
     // Configure silent error handling
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+
+    if (!lpCmdLine || !*lpCmdLine)
+    {
+        RebornDialog launcher;
+        if (DialogBoxParamW(hInstance, MAKEINTRESOURCEW(IDD_REBORN_LAUNCHER), nullptr, RebornDialog::HandleMessage, reinterpret_cast<LPARAM>(&launcher)) == -1)
+        {
+            MessageBoxW(nullptr, L"Reborn Roleplay baslaticisi acilamadi.", L"Reborn Roleplay", MB_OK | MB_ICONERROR);
+            return 1;
+        }
+        return 0;
+    }
 
     // COM initialization
     auto com_result = InitializeCOM();

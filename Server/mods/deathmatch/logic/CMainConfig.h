@@ -148,6 +148,8 @@ public:
     void                            OnAseSettingChange();
     void                            OnPlayerTriggeredEventIntervalChange();
 
+    bool ShouldEnforceClientEventLimit() const { return m_enforceClientEventLimit; }
+
     int GetPlayerTriggeredEventInterval() const { return m_iPlayerTriggeredEventIntervalMs; }
     int GetMaxPlayerTriggeredEventsPerInterval() const { return m_iMaxPlayerTriggeredEventsPerInterval; }
     int GetVoicePacketsInterval() const noexcept { return m_voicePacketsInterval; }
@@ -236,6 +238,7 @@ private:
     int                        m_iPlayerTriggeredEventIntervalMs;
     int                        m_iMaxPlayerTriggeredEventsPerInterval;
     bool                       m_elementDataWhitelisted;
+    bool                       m_enforceClientEventLimit = false;
     bool                       m_checkDuplicateSerials;
     int                        m_checkResourceClientFiles;
     int                        m_voicePacketsInterval{};

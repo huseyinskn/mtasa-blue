@@ -10,6 +10,7 @@
  *****************************************************************************/
 
 #include "StdInc.h"
+#include "RebornServer.h"
 #include "net/Packets.h"
 using namespace std;
 
@@ -51,6 +52,13 @@ bool CConnectManager::Connect(const char* szHost, unsigned short usPort, const c
     assert(szHost);
     assert(szNick);
     assert(szPassword);
+
+    // Apply the same destination restriction to the launcher, console and server browser.
+    if (!Reborn::AllowsServer(szHost, usPort))
+    {
+        CCore::GetSingleton().ShowMessageBox("Reborn Roleplay", "Bu istemci Reborn Roleplay sunucusuna baglanir.", MB_BUTTON_OK | MB_ICON_INFO);
+        return false;
+    }
 
     if (!CCore::GetSingleton().IsNetworkReady())
     {
@@ -248,8 +256,7 @@ void CConnectManager::DoPulse()
                 if (m_pServerItem->bScanned && m_pServerItem->strVersion != MTA_DM_ASE_VERSION)
                 {
                     // Version mis-match. See about launching compatible .exe
-                    GetVersionUpdater()->InitiateSidegradeLaunch(m_pServerItem->strVersion, m_strHost.c_str(), m_usPort, m_strNick.c_str(),
-                                                                 m_strPassword.c_str());
+                    g_pCore->ShowMessageBox("Reborn Roleplay", "Sunucu surumu Reborn istemcisiyle uyumlu degil.", MB_BUTTON_OK | MB_ICON_ERROR);
                     Abort();
                     return;
                 }

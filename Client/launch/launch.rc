@@ -7,7 +7,7 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include "afxres.h"
+#include "winres.h"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -32,7 +32,7 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""afxres.h""\r\n"
+    "#include ""winres.h""\r\n"
     "\0"
 END
 
@@ -53,7 +53,20 @@ END
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENG)
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_UK
-#pragma code_page(1252)
+#pragma code_page(65001)
+
+IDD_REBORN_LAUNCHER DIALOGEX 0, 0, 329, 156
+STYLE DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Reborn Roleplay"
+FONT 10, "Segoe UI"
+BEGIN
+    LTEXT "REBORN ROLEPLAY", IDC_REBORN_TITLE, 17, 13, 294, 26
+    LTEXT "", IDC_REBORN_ENDPOINT, 18, 43, 294, 13
+    LTEXT "MTA takma adı", -1, 18, 65, 134, 13
+    EDITTEXT IDC_REBORN_NICKNAME, 18, 81, 173, 19, ES_AUTOHSCROLL
+    DEFPUSHBUTTON "Oyuna Gir", IDOK, 205, 80, 105, 22
+    LTEXT "Hesap girişi ve karakter seçimi oyun içinde.", IDC_REBORN_STATUS, 18, 114, 292, 27
+END
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -88,10 +101,10 @@ BEGIN
         BLOCK "080904b0"
         BEGIN
             VALUE "CompanyName", "Multi Theft Auto"
-            VALUE "FileDescription", "Multi Theft Auto Launcher"
+            VALUE "FileDescription", "Reborn Roleplay Launcher (MTA: San Andreas)"
             VALUE "FileVersion", "1.6.0.0"
             VALUE "LegalCopyright", "(C) 2003 - 2023 Multi Theft Auto"
-            VALUE "ProductName", "MTA San Andreas"
+            VALUE "ProductName", "Reborn Roleplay"
             VALUE "ProductVersion", "1.6.0.0"
         END
     END

@@ -49,7 +49,7 @@ private:
     void AddElement(CClientStreamElement* pElement);
     void RemoveElement(CClientStreamElement* pElement);
 
-    void SetExpDistances(std::list<CClientStreamElement*>* pList);
+    void UpdateActiveElementDistances();
     void AddToSortedList(std::list<CClientStreamElement*>* pList, CClientStreamElement* pElement);
 
     void Restream(bool bMovedFar);

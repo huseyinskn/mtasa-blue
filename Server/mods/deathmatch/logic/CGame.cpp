@@ -2696,6 +2696,14 @@ void CGame::Packet_LuaEvent(CLuaEventPacket& Packet)
     ElementID      ElementID = Packet.GetElementID();
     CLuaArguments* pArguments = Packet.GetArguments();
 
+    // Count even rejected requests against the sender's budget before Lua dispatch.
+    if (m_pMainConfig->ShouldEnforceClientEventLimit() &&
+        !pCaller->ConsumeClientEventBudget(m_iClientTriggeredEventsIntervalMs, m_iMaxClientTriggeredEventsPerInterval))
+    {
+        RegisterClientTriggeredEventUsage(pCaller, szName);
+        return;
+    }
+
     // Grab the element
     CElement* pElement = CElementIDs::GetElement(ElementID);
     if (pElement)
@@ -4290,7 +4298,7 @@ namespace
 
     SString SanitizePlayerDiagnosticMessage(const SString& strMessage)
     {
-        SString strResult;
+        SString      strResult;
         const size_t uiCopyLength = Min<size_t>(strMessage.length(), MAX_PLAYER_DIAGNOSTIC_LOG_LENGTH);
 
         for (size_t i = 0; i < uiCopyLength; i++)
@@ -4466,8 +4474,7 @@ void CGame::Packet_PlayerResourceStart(CPlayerResourceStartPacket& Packet)
             return;
 
         // Acks for the current send are expected traffic, not flood traffic.
-        const EPlayerResourceStartAck ackResult =
-            pResource->AddPlayerResourceStart(pPlayer, Packet.GetStartGeneration(), Packet.HasStartGeneration());
+        const EPlayerResourceStartAck ackResult = pResource->AddPlayerResourceStart(pPlayer, Packet.GetStartGeneration(), Packet.HasStartGeneration());
 
         if (ackResult == EPlayerResourceStartAck::Accepted)
         {

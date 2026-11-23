@@ -895,7 +895,7 @@ void CGraphics::DrawLineQueued(float fX1, float fY1, float fX2, float fY2, float
     Item.Line.ulColor = ulColor;
 
     // Add it to the queue
-    AddQueueItem(Item, bPostGUI);
+    AddQueueItem(std::move(Item), bPostGUI);
 }
 
 void CGraphics::DrawLine3DQueued(const CVector& vecBegin, const CVector& vecEnd, float fWidth, unsigned long ulColor, eRenderStage stage)
@@ -953,7 +953,7 @@ void CGraphics::DrawRectQueued(float fX, float fY, float fWidth, float fHeight, 
     Item.Rect.bSubPixelPositioning = bSubPixelPositioning;
 
     // Add it to the queue
-    AddQueueItem(Item, bPostGUI);
+    AddQueueItem(std::move(Item), bPostGUI);
 }
 
 void CGraphics::DrawCircleQueued(float fX, float fY, float fRadius, float fStartAngle, float fStopAngle, unsigned long ulColor, unsigned long ulColorCenter,
@@ -1008,7 +1008,7 @@ void CGraphics::DrawPrimitiveQueued(std::vector<PrimitiveVertice>* pVecVertices,
     Item.blendMode = m_ActiveBlendMode;
     Item.Primitive.eType = eType;
     Item.Primitive.pVecVertices = pVecVertices;
-    AddQueueItem(Item, bPostGUI);
+    AddQueueItem(std::move(Item), bPostGUI);
 }
 
 void CGraphics::DrawPrimitive3DQueued(std::vector<PrimitiveVertice>* pVecVertices, D3DPRIMITIVETYPE eType, eRenderStage stage)
@@ -1083,9 +1083,10 @@ void CGraphics::DrawMaterialPrimitiveQueued(std::vector<PrimitiveMaterialVertice
     Item.PrimitiveMaterial.eType = eType;
     Item.PrimitiveMaterial.pMaterial = pMaterial;
     Item.PrimitiveMaterial.pVecVertices = pVecVertices;
-    AddQueueItem(Item, bPostGUI);
 
+    // Enqueuing can clear the item immediately when the window is minimized.
     AddQueueRef(pMaterial);
+    AddQueueItem(std::move(Item), bPostGUI);
 }
 
 bool CGraphics::IsValidPrimitiveSize(int iNumVertives, D3DPRIMITIVETYPE eType)
@@ -1170,7 +1171,7 @@ void CGraphics::DrawTextureQueued(float fX, float fY, float fWidth, float fHeigh
     AddQueueRef(Item.Texture.pMaterial);
 
     // Add it to the queue
-    AddQueueItem(Item, bPostGUI);
+    AddQueueItem(std::move(Item), bPostGUI);
 }
 
 void CGraphics::DrawStringQueued(float fLeft, float fTop, float fRight, float fBottom, unsigned long dwColor, const char* szText, float fScaleX, float fScaleY,
@@ -1240,7 +1241,7 @@ void CGraphics::DrawStringQueued(float fLeft, float fTop, float fRight, float fB
         AddQueueRef(Item.Text.pDXFont);
 
         // Add it to the queue
-        AddQueueItem(Item, bPostGUI);
+        AddQueueItem(std::move(Item), bPostGUI);
         return;
     }
     else
@@ -1400,7 +1401,7 @@ void CGraphics::DrawColorCodedTextLine(float fLeft, float fRight, float fY, SCol
         AddQueueRef(Item.Text.pDXFont);
 
         // Add it to the queue
-        AddQueueItem(Item, bPostGUI);
+        AddQueueItem(std::move(Item), bPostGUI);
 
         fX += section.fWidth;
     }
@@ -1804,13 +1805,13 @@ void CGraphics::DrawQueue(std::vector<sDrawQueueItem>& Queue)
     EndDrawBatch();
 }
 
-void CGraphics::AddQueueItem(const sDrawQueueItem& Item, bool bPostGUI)
+void CGraphics::AddQueueItem(sDrawQueueItem&& Item, bool bPostGUI)
 {
-    // Add it to the correct queue
+    // Transfer text storage into the queue so HUD text does not need a second allocation.
     if (bPostGUI && !CCore::GetSingleton().IsMenuVisible())  // Don't draw over the main menu.  Ever.
-        m_PostGUIQueue.push_back(Item);
+        m_PostGUIQueue.push_back(std::move(Item));
     else
-        m_PreGUIQueue.push_back(Item);
+        m_PreGUIQueue.push_back(std::move(Item));
 
     // Prevent queuing when minimized
     if (g_pCore->IsWindowMinimized())
@@ -1888,7 +1889,8 @@ void CGraphics::DrawQueueItem(const sDrawQueueItem& Item)
         {
             if (CTextureItem* pTexture = DynamicCast<CTextureItem>(Item.Texture.pMaterial))
             {
-                if (CRenderTargetItem* pRenderTarget = DynamicCast<CRenderTargetItem>(pTexture))
+                CRenderTargetItem* pRenderTarget = DynamicCast<CRenderTargetItem>(pTexture);
+                if (pRenderTarget)
                 {
                     if (!pRenderTarget->TryEnsureValid())
                     {
@@ -1911,16 +1913,16 @@ void CGraphics::DrawQueueItem(const sDrawQueueItem& Item)
                     break;
                 }
 
-                const sDrawQueueTexture& t = Item.Texture;
-                RECT                     cutImagePos;
-                const float              fSurfaceWidth = pTexture->m_uiSurfaceSizeX;
-                const float              fSurfaceHeight = pTexture->m_uiSurfaceSizeY;
-                const float              fFileWidth = Item.Texture.pMaterial->m_uiSizeX;
-                const float              fFileHeight = Item.Texture.pMaterial->m_uiSizeY;
-                cutImagePos.left = (Item.Texture.fU) * (Item.Texture.bRelativeUV ? fSurfaceWidth : fSurfaceWidth / fFileWidth);
-                cutImagePos.top = (Item.Texture.fV) * (Item.Texture.bRelativeUV ? fSurfaceHeight : fSurfaceHeight / fFileHeight);
-                cutImagePos.right = (Item.Texture.fU + Item.Texture.fSizeU) * (Item.Texture.bRelativeUV ? fSurfaceWidth : fSurfaceWidth / fFileWidth);
-                cutImagePos.bottom = (Item.Texture.fV + Item.Texture.fSizeV) * (Item.Texture.bRelativeUV ? fSurfaceHeight : fSurfaceHeight / fFileHeight);
+                const auto& texture = Item.Texture;
+                const float surfaceWidth = pTexture->m_uiSurfaceSizeX;
+                const float surfaceHeight = pTexture->m_uiSurfaceSizeY;
+                const float scaleU = texture.bRelativeUV ? surfaceWidth : surfaceWidth / texture.pMaterial->m_uiSizeX;
+                const float scaleV = texture.bRelativeUV ? surfaceHeight : surfaceHeight / texture.pMaterial->m_uiSizeY;
+                RECT        cutImagePos;
+                cutImagePos.left = texture.fU * scaleU;
+                cutImagePos.top = texture.fV * scaleV;
+                cutImagePos.right = (texture.fU + texture.fSizeU) * scaleU;
+                cutImagePos.bottom = (texture.fV + texture.fSizeV) * scaleV;
                 const float       fCutWidth = cutImagePos.right - cutImagePos.left;
                 const float       fCutHeight = cutImagePos.bottom - cutImagePos.top;
                 const D3DXVECTOR2 scaling(Item.Texture.fWidth / fCutWidth, Item.Texture.fHeight / fCutHeight);

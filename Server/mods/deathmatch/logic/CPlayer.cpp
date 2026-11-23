@@ -202,6 +202,23 @@ void CPlayer::DoPulse()
     }
 }
 
+bool CPlayer::ConsumeClientEventBudget(unsigned int intervalMs, unsigned int eventLimit)
+{
+    const auto now = GetTickCount64_();
+    // Start a new window on demand so packet handling does not depend on the next server pulse.
+    if (m_clientEventsInWindow == 0 || now - m_clientEventWindowStart >= intervalMs)
+    {
+        m_clientEventWindowStart = now;
+        m_clientEventsInWindow = 0;
+    }
+
+    if (m_clientEventsInWindow >= eventLimit)
+        return false;
+
+    ++m_clientEventsInWindow;
+    return true;
+}
+
 void CPlayer::SetNick(const char* szNick)
 {
     m_strNick.AssignLeft(szNick, MAX_PLAYER_NICK_LENGTH);
